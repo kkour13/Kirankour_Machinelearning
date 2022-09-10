@@ -1,0 +1,86 @@
+---
+title: "MIS-64040-001"
+author: "Kiran Kour"
+date: "2022-09-08"
+output: html_document
+---
+
+# Assignment 1 : Know how to use software tools (such as R) effectively to implement machine learning algorithms for data mining/visualization and analytics
+
+#The source of my dataset is (<https://www.contextures.com/xlsampledata01.html>) which you can access from the above link.
+
+**#Importing the dataset:**
+
+```{r}
+foodsales <- read.csv("foodsales.csv")
+head(foodsales)
+```
+
+**#Descriptive Statistics for Categorical Variables:**
+
+```{r}
+freq <- table(foodsales$City)
+head(freq)
+```
+
+```{r}
+freq <- table(foodsales$Product,foodsales$Category)
+head(freq)
+```
+
+```{r}
+freq <- table(foodsales$OrderDate,foodsales$Category,foodsales$Product)
+head(freq)
+```
+
+**#Plotting of Qualitative Variables:**
+
+```{r}
+freq <- table(foodsales$City,foodsales$Product)
+barplot(freq,main="Country VS Product",xlab="Country",ylab="Product",horiz=TRUE,col="blue",las=1,cex.names=0.5)
+```
+
+**#Descriptive Statistics for Quantitative Variables:**
+
+```{r}
+summary(foodsales)
+```
+
+**#Summary measures for Total Price:**
+
+```{r}
+mean(foodsales$TotalPrice)
+median(foodsales$TotalPrice)
+sd(foodsales$TotalPrice)
+range(foodsales$TotalPrice)
+```
+
+```{r}
+require(e1071)
+skewness(foodsales$TotalPrice)
+kurtosis(foodsales$TotalPrice)
+```
+
+**#Plotting of Quantitative Variables:**
+
+```{r}
+plot(foodsales$Quantity~foodsales$UnitPrice,main="Scatter Plot",xlab="UnitPrice",ylab="Quantity",col="Black",type="p")
+```
+
+```{r}
+plot(foodsales$Quantity~foodsales$TotalPrice,main="Scatter Plot",xlab="TotalPrice",ylab="Quantity",pch=19,frame=FALSE)
+abline(lm(Quantity~TotalPrice,data=foodsales),col="blue")
+```
+
+**#Transformation of the Variable:**
+
+```{r}
+sqrt_UnitPrice<- sqrt(foodsales$UnitPrice)
+hist(foodsales$UnitPrice,col="Steel blue",main="Original")
+```
+
+**#Plot for Square Root Transformation:**
+
+```{r}
+hist(sqrt_UnitPrice,col="coral2",main="Square Root Transformed")
+```
