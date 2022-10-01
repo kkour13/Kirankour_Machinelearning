@@ -1,0 +1,240 @@
+---
+title: "Assignment 2"
+author: "Kiran Kour"
+date: "2022-09-23"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+
+#Importing required packages
+
+```{r}
+#install.packages("FNN")
+#install.packages("psych")
+library(psych)
+library(FNN)
+library(ISLR)
+library(class)
+library(caret)
+```
+
+#Importing dataset
+
+```{r}
+universalbank<- read.csv("UniversalBank.csv")
+```
+
+#Eliminating ZIP code and ID from the dataset
+
+```{r}
+ds=subset(universalbank, select=-c(ID, ZIP.Code ))
+```
+
+#Using is.na() to check for missing values
+
+```{r}
+ds_na <- is.na.data.frame("ds")
+```
+
+#Converting Categorical variables with numeric class to factors 
+
+```{r}
+ds$Personal.Loan =  as.factor(ds$Personal.Loan)
+ds$Education= as.factor(ds$Education)
+summary(ds)
+```
+
+
+
+
+#Creating dummy variables for education (categorical variables with more than 2 categories) using library (psych) and eliminating education 
+
+```{r}
+dummy_education <- as.data.frame(dummy.code(ds$Education))
+names(dummy_education) <- c("Education_1", "Education_2","Education_3") 
+ds_noeducation <- subset(ds, select=-c(Education))
+ub <- cbind(ds_noeducation, dummy_education)
+summary(ub)
+```
+
+
+#Dividing the dataset into Training and Validation set and using preProcess() to normalize the dataset
+
+```{r}
+set.seed(123)
+Train_Index <-createDataPartition(ub$Personal.Loan, p=0.6, list=FALSE)
+Train_ub <-ub[Train_Index,]
+Validation_ub <-ub[-Train_Index,]
+```
+
+```{r}
+Model_norm <- preProcess(Train_ub[,-c(7,12:14)],method = c("center", "scale"))
+Train_norm_ub <- predict(Model_norm,Train_ub)
+Validation_norm_ub<- predict(Model_norm,Validation_ub)
+```
+
+
+#Creating a test dataset
+
+```{r}
+Test_data <- cbind.data.frame(Age=40 , Experience=10, Income = 84, Family=2, CCAvg = 2, Mortgage = 0, Securities.Account = 0, CD.Account = 0, Online = 1,  CreditCard = 1,  Education_1 = 0, Education_2 = 1, Education_3 = 0)
+```
+
+#Normalizing the test dataset using z-score
+
+```{r}
+Test_norm_ub <- predict(Model_norm, Test_data)
+```
+
+#Q1= Implementing kNN classification using k=1
+
+```{r}
+Train_Predictors <- Train_norm_ub[,-7]
+Validation_Predictors <- Validation_norm_ub[,-7]
+Train_Labels <- Train_norm_ub[,7]
+Validate_Lables <- Validation_norm_ub[,7]
+Knn <- knn(Train_Predictors, Test_norm_ub, cl=Train_Labels, k=1)
+head(Knn)
+```
+Since success class is specified as 1, here when k=1 customer is classified as 0 which means loan is not accepted.
+
+
+
+#Q2= Finding the best k
+
+```{r}
+set.seed(123)
+search_grid <- expand.grid(k=c(1:20))
+#trtcontrol <- trainControl(method="repeatedcv")
+model <- train(Personal.Loan~Age+Experience+Income+Family+CCAvg+Mortgage+Securities.Account+CD.Account+Online+CreditCard+Education_1+Education_2+Education_3, data=Train_norm_ub, method="knn",tuneGrid = search_grid)
+model
+```
+
+```{r}
+bestk <- model$bestTune[[1]]
+bestk
+```
+
+#The value of  best k is 1 as it provides the best result [i.e the choice of k that balances between overfitting and ignoring the predictor information]
+
+```{r}
+plot(model)
+```
+
+
+
+#3 Confusion matrix for the validation data that results from using the best k. 
+
+
+```{r}
+library(gmodels)
+```
+```{r}
+ConfusionMatrix<- predict(model,Validation_norm_ub[,-7])
+confusionMatrix(ConfusionMatrix,Validate_Lables)
+```
+Miscalculation= False positive+ False negative= 73, Accuracy= 0.9635, Sensitivity= 0.9895
+
+
+
+#4 Running best k on test data
+
+```{r}
+test_bestk <- knn(Train_Predictors, Test_norm_ub, cl=Train_Labels, k=bestk)
+head(test_bestk)
+```
+
+The customer is classified as 0 by choosing the best k, which means the loan is not accepted
+
+
+
+#5 Reparting the data, this time into training, validation, and test sets and applying the k-NN method with the k chosen above. 
+
+```{r}
+Model.norm<- preProcess(ub[,-c(7,12:14)],method=c("center","scale"))
+universalbank_norm <- predict(Model.norm,ub)
+```
+
+```{r}
+set.seed(422)
+univbank <-createDataPartition(ub$Personal.Loan, p=0.5, list=FALSE)
+Train_univbank <-ub[univbank,]
+Testdata_univbank <-ub[-univbank,]
+
+univbank_v <-createDataPartition(Testdata_univbank$Personal.Loan,p=0.6,list = FALSE)
+Validate_univbank <- Testdata_univbank[univbank_v,]
+Test_univbank <- Testdata_univbank[-univbank_v,]
+```
+```{r}
+Model.norm<- preProcess(ub[,-c(7,12:14)],method=c("center","scale"))
+
+Train_norm <- predict(Model.norm,Train_univbank)
+Validate_norm <- predict(Model.norm,Validate_univbank)
+Test_norm<- predict(Model.norm,Test_univbank)
+```
+
+
+#Performing Knn classification with the k chosen above
+
+```{r}
+Trainub_predictor <- Train_norm[,-7]
+Validateub_predictor <- Validate_norm[,-7]
+Testub_predictor <- Test_norm[,-7]
+
+Trainub_labels <- Train_norm[,7]
+Validateub_labels <- Validate_norm[,7]
+Testub_labels <- Test_norm[,7]
+```
+
+
+#KNN classification over train dataset using the best k
+
+```{r}
+T_KNN_model <- knn(Trainub_predictor,Trainub_predictor,cl= Trainub_labels,k=bestk)
+head(T_KNN_model)
+```
+
+
+#KNN classification over validation dataset using the best k
+
+```{r}
+V_KNN_model <- knn(Trainub_predictor,Validateub_predictor,cl=Trainub_labels,k=bestk)
+head(V_KNN_model)
+```
+
+
+#KNN classification over test dataset using the best k
+
+```{r}
+TE_KNN_model<- knn(Trainub_predictor,Testub_predictor,cl=Trainub_labels,k=bestk)
+head(TE_KNN_model)
+```
+#Confusion matrix to compare test set with that of the training and validation sets.
+
+```{r}
+confusionMatrix(T_KNN_model,Trainub_labels)
+```
+#The reason for 0 miscalculations, Accuracy=1 and Sensitivity= 1 is that train and test dataset are same. Therefore, it cannot predict any miscalculations and has an Accuracy of 100%
+
+
+```{r}
+confusionMatrix(V_KNN_model,Validateub_labels)
+```
+#Miscalucations= False positive+ False Negative= 56+24= 80, Accuracy= 0.9467, Sensitivity = 0.9823
+
+
+```{r}
+confusionMatrix(TE_KNN_model,Testub_labels)
+```
+Miscalculations= False positive+ False negative= 26+13= 39, Accuracy= 0.961, Sensitivity= 0.9856
+
+
+#Interpretation: The training data shall be excluded from the consideration because it has already seen the data. Therefore, it will give a 100% accuracy when compared with other two models. 
+
+#Miscalculations: Validation - 80, Test - 39
+#Accuracy: Validation - 0.9467, Test - 0.961
+#Sensitivty: Validation - 0.9823, Test - 0.9856
+
+#When we compare test model with that of validation model we see that test model has fewer miscalculations as compared to validation. It also has higher accuracy and sensitivity, making it work well.
