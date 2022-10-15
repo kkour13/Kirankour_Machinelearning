@@ -1,0 +1,171 @@
+---
+title: "MIS-64060-001(A3)"
+author: "Kiran Kour"
+date: "2022-10-10"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+#Importing required packages
+
+```{r}
+#install.packages("reshape")
+#install.packages("reshape2")
+#install.packages("melt")
+#install.packages("naivebayes")
+#install.packages("pROC")
+```
+```{r}
+library(readr)
+library(dplyr)
+library(caret)
+library(class)
+library(melt)
+library(reshape)
+library(reshape2)
+library(ggplot2)
+library(ISLR)
+library(naivebayes)
+library(e1071)
+library(pROC)
+```
+
+#Importing the dataset
+
+```{r}
+universalbank<- read.csv("UniversalBank.csv")
+head(universalbank,n=5)
+```
+#Checking for missing values using is.na()
+
+```{r}
+bank <- is.na.data.frame("universalbank")
+```
+
+#Converting the data type of categorical variables to factor
+
+```{r}
+universalbank$Personal.Loan= as.factor(universalbank$Personal.Loan)
+universalbank$Online= as.factor(universalbank$Online)
+universalbank$CreditCard= as.factor(universalbank$CreditCard)
+```
+
+#Data Partition and Normalization
+
+```{r}
+set.seed(333)
+Train_Index<- createDataPartition(universalbank$Personal.Loan, p=0.6, list=FALSE)
+Train <-universalbank[Train_Index,]
+Valid <-universalbank[-Train_Index,]
+```
+
+```{r}
+Model_norm <- preProcess(Train[,-c(10,13:14)],method = c("center", "scale"))
+Train_norm <- predict(Model_norm,Train)
+Valid_norm<- predict(Model_norm,Valid)
+```
+
+# Part A: Creating pivot table for Training data
+
+```{r}
+Table.OCP <- table(Train_norm$Personal.Loan, Train_norm$Online, Train_norm$CreditCard, dnn=c("Personal Loan", "Online", "Credit Card"))
+Table.OCP
+```
+
+## Part B: Computing P(Loan | Online & CC)
+
+As we look that the pivot table created in part A out of the total 550 records where of active online banking users with credit cards, 49 had accepted a personal loan, so $$\textbf{P}(\text{Loan}=1\ |\ \text{CC}=1\text {and}\text{ Online}=1) = \frac{49}{550} = 0.089$$.
+```{r}
+# Computing P(loan | Online & CC)
+Table.OCP[2,2,2] / (Table.OCP[2,2,2] + Table.OCP[1,2,2])
+```
+
+# Part C: Creating two separate pivot tables for Training data.One will have Loan (rows) as a function of Online (columns) and the other will have Loan (rows) as a function of CC. 
+
+```{r}
+Table_Online <- table(Train_norm$Personal.Loan, Train_norm$Online, dnn=c("Personal Loan", "Online"))
+Table_Online
+
+Table_CreditCard <- table(Train_norm$Personal.Loan, Train$CreditCard, dnn=c("Personal Loan", "Credit Card"))
+Table_CreditCard
+```
+
+# Part D : Computing the following quantities:
+
+i.) $$\textbf{P}\text{(CC = 1 | Loan = 1)}\text{= 80/80+208}$$
+
+```{r}
+prob_CCL <- Table_CreditCard[2,2] / (Table_CreditCard[2,2] + Table_CreditCard[2,1])
+prob_CCL
+```
+
+ii.)$$\textbf{P}\text{(Online = 1 | Loan = 1)}\text{= 184/184+104}$$
+
+```{r}
+prob_OL <- Table_Online[2,2] / (Table_Online[2,2] + Table_Online[2,1])
+prob_OL
+```
+
+iii.) $$\textbf{P}\text{(Loan = 1)}\text{= 288/288+2712}$$
+
+```{r}
+prob_Loan <- sum(Train_norm$Personal.Loan==1) / length(Train_norm$Personal.Loan)
+prob_Loan
+```
+
+iv.) $$\textbf{P}\text{(CC = 1 | Loan = 0)}\text{= 806/806+1906}$$
+
+```{r}
+prob_CCNL <-Table_CreditCard[1,2] / (Table_CreditCard[1,2] + Table_CreditCard[1,1])
+prob_CCNL
+```
+v.) $$\textbf{P}\text{(Online = 1 | Loan = 0)}\text{= 1621/1621+1091}$$
+
+```{r}
+prob_ONL <- Table_Online[1,2] / (Table_Online[1,2] + Table_Online[1,1])
+prob_ONL
+```
+vi.) $$\textbf{P}\text{(Loan = 0)}\text{= 2712/2712+288}$$
+
+```{r}
+prob_NL <- sum(Train_norm$Personal.Loan==0) / length(Train_norm$Personal.Loan)
+prob_NL
+```
+
+# Part E : Using the quantities computed above to compute the Naive Bayes probability P(Loan = 1 | CC = 1, Online = 1).
+$$\textbf{P}(\text{Loan}=1\ |\ \text{CC}=1,\text{ Online}=1)\text{= (0.6388 x 0.2777 x 0.096) / (0.6388 x 0.2777 x 0.096 + 0.5977 x 0.2972 x 0.904)= 0.0959}$$
+
+```{r}
+(prob_OL * prob_CCL * prob_Loan) / (prob_OL * prob_CCL * prob_Loan + prob_ONL * prob_CCNL * prob_NL)
+```
+
+# Part F : Comparing the value obtained from part Naive bayes probability with the one obtained from the pivot table in (B). 
+
+Using the Naive Bayes classifier, we get a higher value for $\text{P}(\text{Loan}=1\ |\ \text{CC}=1,\text{ Online}=1)$ than with the direct computation obtained in part B. Interestingly, in part D we got the value of  $\textbf{P}\text{(Loan = 1)}$ as 0.096 and also in Naive bayes classifer we got the value as 0.096. So the Naive Bayes approach suggests that the probability a person will accept the loan is independent of whether that person is an online user with a bank-issued credit card.
+
+# Part G : Running Naive Bayes on the data
+
+```{r}
+naive <- naiveBayes(Personal.Loan~Online+CreditCard,data=Train_norm)
+naive
+```
+The value that is obtained for the probability of loan acceptance (Loan = 1) conditional on having a bank credit card (CC = 1) and being an active user of online banking services (Online = 1) from running Naive bayes is 0.09591693 , which is equal to the value derived from part E.
+
+# AUC Value and ROC Curve
+
+```{r}
+Predicted_labels <-predict(naive,Valid_norm, type = "raw")
+head(Predicted_labels)
+```
+```{r}
+roc(Valid_norm$Online, Predicted_labels[,2])
+```
+
+```{r}
+plot.roc(Valid_norm$Online,Predicted_labels[,2])
+```
